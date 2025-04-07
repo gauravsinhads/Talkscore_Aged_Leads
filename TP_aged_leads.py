@@ -7,8 +7,8 @@ from datetime import datetime, timedelta
 st.title("Time Between Completion Date and Status")
 
 # Upload CSV files
-hired_file = st.file_uploader("Upload TP_Aged_Leads_hired.csv", type=["csv"])
-shortlisted_file = st.file_uploader("Upload TP_Aged_Leads_shortlisted.csv", type=["csv"])
+hired_file = pd.read_csv('TP_Aged_Leads_hired.csv')
+shortlisted_file = pd.read_csv('TP_Aged_Leads_shortlisted.csv')
 
 # Dropdown filter
 time_filter = st.selectbox(
