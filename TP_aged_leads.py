@@ -51,10 +51,16 @@ shortlisted_counts = shortlisted_filtered['Time_Category'].value_counts().reinde
     ['Less than 1 day', '1-3 days', '4-7 days', '7-9 days', 'More than 9 days']
 ).fillna(0)
 
+total_shortlisted = shortlisted_counts.sum()
+shortlisted_labels = [
+    f"{int(v)} ({v / total_shortlisted * 100:.1f}%)" if total_shortlisted > 0 else "0 (0%)"
+    for v in shortlisted_counts.values
+]
+
 fig_shortlisted = px.bar(
     x=shortlisted_counts.index,
     y=shortlisted_counts.values,
-    text=shortlisted_counts.values,
+    text=shortlisted_labels,
     labels={'x': 'Time Range', 'y': 'Count'},
     title=f'Amount of time b/w Completion date and Shortlisted ({time_filter})'
 )
@@ -67,10 +73,16 @@ hired_counts = hired_filtered['Time_Category'].value_counts().reindex(
     ['Less than 1 day', '1-3 days', '4-7 days', '7-9 days', 'More than 9 days']
 ).fillna(0)
 
+total_hired = hired_counts.sum()
+hired_labels = [
+    f"{int(v)} ({v / total_hired * 100:.1f}%)" if total_hired > 0 else "0 (0%)"
+    for v in hired_counts.values
+]
+
 fig_hired = px.bar(
     x=hired_counts.index,
     y=hired_counts.values,
-    text=hired_counts.values,
+    text=hired_labels,
     labels={'x': 'Time Range', 'y': 'Count'},
     title=f'Amount of time b/w Completion date and Hired ({time_filter})'
 )
@@ -98,17 +110,22 @@ def categorize_employment(df):
     return result
 
 employment_counts = categorize_employment(hired_filtered)
+categories = ['0-30 Days', '31-60 Days', '61-90 Days', '90 Days and More', 'Active & Dormant']
+counts = [employment_counts.get(cat, 0) for cat in categories]
+total_emp = sum(counts)
+labels = [
+    f"{v} ({v / total_emp * 100:.1f}%)" if total_emp > 0 else "0 (0%)"
+    for v in counts
+]
 
 fig_employment = px.bar(
-    x=list(employment_counts.values()),
-    y=list(employment_counts.keys()),
+    x=counts,
+    y=categories,
     orientation='h',
-    text=list(employment_counts.values()),
+    text=labels,
     labels={'x': 'Count', 'y': 'Employment Duration'},
     title='Employment Duration Status (Hired)'
 )
 fig_employment.update_traces(textposition='outside')
-fig_employment.update_layout(yaxis={'categoryorder':'array', 'categoryarray': [
-    '0-30 Days', '31-60 Days', '61-90 Days', '90 Days and More', 'Active & Dormant'
-]})
+fig_employment.update_layout(yaxis={'categoryorder': 'array', 'categoryarray': categories})
 st.plotly_chart(fig_employment, use_container_width=True)
