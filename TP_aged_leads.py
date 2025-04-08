@@ -3,18 +3,12 @@ import pandas as pd
 import plotly.express as px
 from datetime import datetime
 
-# Set title
-st.title("Time Between Completion Date and Status")
+st.set_page_config(layout="wide")
+st.title("Aged Leads Dashboard")
 
 # Read local CSVs
 hired = pd.read_csv('TP_Aged_Leads_hired.csv')
 shortlisted = pd.read_csv('TP_Aged_Leads_shortlisted.csv')
-
-# Dropdown filter
-time_filter = st.selectbox(
-    "Select Time Range for Analysis:",
-    options=["Last 6 Months", "Last 12 Months"]
-)
 
 # Convert datetime columns
 common_date_cols = ['INVITATIONDT', 'COMPLETIONDT', 'ACTIVITY_CREATED_AT', 'INSERTEDDATE']
@@ -22,25 +16,36 @@ for col in common_date_cols:
     hired[col] = pd.to_datetime(hired[col], errors='coerce')
     shortlisted[col] = pd.to_datetime(shortlisted[col], errors='coerce')
 
-# TERMINATIONDATE only in hired
 hired['TERMINATIONDATE'] = pd.to_datetime(hired['TERMINATIONDATE'], errors='coerce')
 
-# Time filtering
-today = pd.to_datetime(datetime.today())
-months_back = 6 if time_filter == "Last 6 Months" else 12
-date_cutoff = today - pd.DateOffset(months=months_back)
+# WORKLOCATION filter
+all_locations = sorted(set(hired['WORKLOCATION'].dropna().unique()).union(
+    shortlisted['WORKLOCATION'].dropna().unique()
+))
+selected_location = st.selectbox("Select WORKLOCATION:", options=["All"] + all_locations)
 
+# Apply location filter
+if selected_location != "All":
+    hired = hired[hired['WORKLOCATION'] == selected_location]
+    shortlisted = shortlisted[shortlisted['WORKLOCATION'] == selected_location]
+
+# Time range dropdown
+time_filter = st.selectbox("Select Time Range for Analysis:", options=["Last 6 Months", "Last 12 Months"])
+months_back = 6 if time_filter == "Last 6 Months" else 12
+date_cutoff = pd.to_datetime(datetime.today()) - pd.DateOffset(months=months_back)
+
+# Apply date filtering
 hired_filtered = hired[hired['COMPLETIONDT'] >= date_cutoff]
 shortlisted_filtered = shortlisted[shortlisted['COMPLETIONDT'] >= date_cutoff]
 
-# Time binning function
+# Categorize time between COMPLETIONDT and INSERTEDDATE
 def categorize_days_diff(df):
     days_diff = (df['COMPLETIONDT'] - df['INSERTEDDATE']).dt.days.abs()
     bins = [-1, 0, 3, 7, 9, float('inf')]
     labels = ['Less than 1 day', '1-3 days', '4-7 days', '7-9 days', 'More than 9 days']
     return pd.cut(days_diff, bins=bins, labels=labels)
 
-# --- Shortlisted Time Category Plot ---
+# ---- Shortlisted Graph ----
 shortlisted_filtered['Time_Category'] = categorize_days_diff(shortlisted_filtered)
 shortlisted_counts = shortlisted_filtered['Time_Category'].value_counts().reindex(
     ['Less than 1 day', '1-3 days', '4-7 days', '7-9 days', 'More than 9 days']
@@ -54,9 +59,9 @@ fig_shortlisted = px.bar(
     title=f'Amount of time b/w Completion date and Shortlisted ({time_filter})'
 )
 fig_shortlisted.update_traces(textposition='outside')
-st.plotly_chart(fig_shortlisted)
+st.plotly_chart(fig_shortlisted, use_container_width=True)
 
-# --- Hired Time Category Plot ---
+# ---- Hired Graph ----
 hired_filtered['Time_Category'] = categorize_days_diff(hired_filtered)
 hired_counts = hired_filtered['Time_Category'].value_counts().reindex(
     ['Less than 1 day', '1-3 days', '4-7 days', '7-9 days', 'More than 9 days']
@@ -70,12 +75,10 @@ fig_hired = px.bar(
     title=f'Amount of time b/w Completion date and Hired ({time_filter})'
 )
 fig_hired.update_traces(textposition='outside')
-st.plotly_chart(fig_hired)
+st.plotly_chart(fig_hired, use_container_width=True)
 
-# --- Employment Duration & Status Plot ---
-
+# ---- Employment Duration Graph ----
 def categorize_employment(df):
-    # Terminated: with valid dates
     terminated = df[
         (df['EMPLOYMENTSTATUS'] == 'Terminated') &
         df['TERMINATIONDATE'].notna() &
@@ -83,19 +86,12 @@ def categorize_employment(df):
     ].copy()
 
     terminated['Duration_Days'] = (terminated['TERMINATIONDATE'] - terminated['INSERTEDDATE']).dt.days
-
-    # Duration bins
     bins = [-1, 30, 60, 90, float('inf')]
     labels = ['0-30 Days', '31-60 Days', '61-90 Days', '90 Days and More']
     terminated['Category'] = pd.cut(terminated['Duration_Days'], bins=bins, labels=labels)
-
-    # Count terminated buckets
     term_counts = terminated['Category'].value_counts().reindex(labels, fill_value=0)
 
-    # Active & Dormant count
     active_dormant_count = df[df['EMPLOYMENTSTATUS'].isin(['Active', 'Dormant'])].shape[0]
-
-    # Combine
     result = term_counts.to_dict()
     result['Active & Dormant'] = active_dormant_count
 
@@ -103,7 +99,6 @@ def categorize_employment(df):
 
 employment_counts = categorize_employment(hired_filtered)
 
-# Build horizontal bar chart
 fig_employment = px.bar(
     x=list(employment_counts.values()),
     y=list(employment_counts.keys()),
@@ -116,5 +111,4 @@ fig_employment.update_traces(textposition='outside')
 fig_employment.update_layout(yaxis={'categoryorder':'array', 'categoryarray': [
     '0-30 Days', '31-60 Days', '61-90 Days', '90 Days and More', 'Active & Dormant'
 ]})
-
-st.plotly_chart(fig_employment)
+st.plotly_chart(fig_employment, use_container_width=True)
