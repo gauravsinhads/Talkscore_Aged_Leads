@@ -6,19 +6,21 @@ from datetime import datetime
 st.set_page_config(layout="wide")
 st.title("Aged Leads Dashboard")
 
-# Read local CSVs
+# 🎨 Define custom color palette
+colors = ["#001E44", "#F5F5F5", "#E53855", "#B4BBBE", "#2F76B9", "#3B9790", "#F5BA2E", "#6A4C93", "#F77F00"]
+
+# 📥 Load CSV files
 hired = pd.read_csv('TP_Aged_Leads_hired.csv')
 shortlisted = pd.read_csv('TP_Aged_Leads_shortlisted.csv')
 
-# Convert datetime columns
+# 📅 Convert datetime columns
 common_date_cols = ['INVITATIONDT', 'COMPLETIONDT', 'ACTIVITY_CREATED_AT', 'INSERTEDDATE']
 for col in common_date_cols:
     hired[col] = pd.to_datetime(hired[col], errors='coerce')
     shortlisted[col] = pd.to_datetime(shortlisted[col], errors='coerce')
-
 hired['TERMINATIONDATE'] = pd.to_datetime(hired['TERMINATIONDATE'], errors='coerce')
 
-# WORKLOCATION filter
+# 🔽 WORKLOCATION filter
 all_locations = sorted(set(hired['WORKLOCATION'].dropna().unique()).union(
     shortlisted['WORKLOCATION'].dropna().unique()
 ))
@@ -29,23 +31,23 @@ if selected_location != "All":
     hired = hired[hired['WORKLOCATION'] == selected_location]
     shortlisted = shortlisted[shortlisted['WORKLOCATION'] == selected_location]
 
-# Time range dropdown
+# 🔽 Time range dropdown
 time_filter = st.selectbox("Select Time Range for Analysis:", options=["Last 6 Months", "Last 12 Months"])
 months_back = 6 if time_filter == "Last 6 Months" else 12
 date_cutoff = pd.to_datetime(datetime.today()) - pd.DateOffset(months=months_back)
 
-# Apply date filtering
+# Filter dataframes by COMPLETIONDT
 hired_filtered = hired[hired['COMPLETIONDT'] >= date_cutoff]
 shortlisted_filtered = shortlisted[shortlisted['COMPLETIONDT'] >= date_cutoff]
 
-# Categorize time between COMPLETIONDT and INSERTEDDATE
+# 🧮 Categorize time between COMPLETIONDT and INSERTEDDATE
 def categorize_days_diff(df):
     days_diff = (df['COMPLETIONDT'] - df['INSERTEDDATE']).dt.days.abs()
     bins = [-1, 0, 3, 7, 9, float('inf')]
     labels = ['Less than 1 day', '1-3 days', '4-7 days', '7-9 days', 'More than 9 days']
     return pd.cut(days_diff, bins=bins, labels=labels)
 
-# ---- Shortlisted Graph ----
+# 📊 Shortlisted Graph
 shortlisted_filtered['Time_Category'] = categorize_days_diff(shortlisted_filtered)
 shortlisted_counts = shortlisted_filtered['Time_Category'].value_counts().reindex(
     ['Less than 1 day', '1-3 days', '4-7 days', '7-9 days', 'More than 9 days']
@@ -62,12 +64,13 @@ fig_shortlisted = px.bar(
     y=shortlisted_counts.values,
     text=shortlisted_labels,
     labels={'x': 'Time Range', 'y': 'Count'},
-    title=f'Amount of time b/w Completion date and Shortlisted ({time_filter})'
+    title=f'Amount of time b/w Completion date and Shortlisted ({time_filter})',
+    color_discrete_sequence=[colors[0]]
 )
 fig_shortlisted.update_traces(textposition='outside')
 st.plotly_chart(fig_shortlisted, use_container_width=True)
 
-# ---- Hired Graph ----
+# 📊 Hired Graph
 hired_filtered['Time_Category'] = categorize_days_diff(hired_filtered)
 hired_counts = hired_filtered['Time_Category'].value_counts().reindex(
     ['Less than 1 day', '1-3 days', '4-7 days', '7-9 days', 'More than 9 days']
@@ -84,12 +87,13 @@ fig_hired = px.bar(
     y=hired_counts.values,
     text=hired_labels,
     labels={'x': 'Time Range', 'y': 'Count'},
-    title=f'Amount of time b/w Completion date and Hired ({time_filter})'
+    title=f'Amount of time b/w Completion date and Hired ({time_filter})',
+    color_discrete_sequence=[colors[2]]
 )
 fig_hired.update_traces(textposition='outside')
 st.plotly_chart(fig_hired, use_container_width=True)
 
-# ---- Employment Duration Graph ----
+# 📊 Employment Duration Graph
 def categorize_employment(df):
     terminated = df[
         (df['EMPLOYMENTSTATUS'] == 'Terminated') &
@@ -124,7 +128,8 @@ fig_employment = px.bar(
     orientation='h',
     text=labels,
     labels={'x': 'Count', 'y': 'Employment Duration'},
-    title='Employment Duration Status (Hired)'
+    title='Employment Duration Status (Hired)',
+    color_discrete_sequence=[colors[4]]
 )
 fig_employment.update_traces(textposition='outside')
 fig_employment.update_layout(yaxis={'categoryorder': 'array', 'categoryarray': categories})
